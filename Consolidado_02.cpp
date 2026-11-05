@@ -6,17 +6,20 @@
 
 using namespace std;
 
-// ===== 1. ESTRUCTURAS DE DATOS BASE (REGISTROS) =====
+// ============================================================================
+// ===== 1. ESTRUCTURAS DE DATOS BASE (REGISTROS) =============================
+// ============================================================================
 
+// Registro que representa las propiedades de un proceso del sistema
 struct Proceso {
-    int id;
-    string nombre;
-    int prioridad;         // 1: Alta, 2: Media, 3: Baja
-    int tiempoEjecucion;   // En segundos
-    int memoria;           // En MB
+    int id;                // Identificador único (1, 2, 3...)
+    string nombre;         // Nombre del proceso
+    int prioridad;         // Prioridad (1: Alta, 2: Media, 3: Baja)
+    int tiempoEjecucion;   // Duración en segundos
+    int memoria;           // Requerimiento de memoria en MB
 };
 
-// Nodo para Lista Enlazada (Gestor de Procesos)
+// Nodo para Lista Enlazada Simplemente Ligada (Gestor de Procesos)
 struct NodoLista {
     Proceso dato;
     NodoLista* siguiente;
@@ -28,36 +31,41 @@ struct NodoCola {
     NodoCola* siguiente;
 };
 
-// Estructura y Nodo para Pila Dinamica (Gestor de RAM)
+// Registro de Bloque de RAM y Nodo para Pila Dinámica (Gestor de Memoria)
 struct BloqueMemoria {
-    int idBloque;
-    int tamanoMB;
-    int idProceso; // -1 indica que esta LIBRE
+    int idBloque;   // ID del bloque físico (1 a 5)
+    int tamanoMB;   // Tamaño del bloque en MB
+    int idProceso;  // ID del proceso asignado (-1 indica que el bloque está LIBRE)
 };
 
 struct NodoPila {
     BloqueMemoria dato;
     NodoPila* siguiente;
 };
-// ===== 2. GESTOR DE PROCESOS (LISTA ENLAZADA) =====
 
+// ============================================================================
+// ===== 2. GESTOR DE PROCESOS (LISTA ENLAZADA) ===============================
+// ============================================================================
+
+// Agrega un nuevo proceso al final de la Lista Enlazada
 void registrarProceso(NodoLista*& cabeza, Proceso p) {
-    NodoLista* nuevo = new NodoLista();
+    NodoLista* nuevo = new NodoLista(); // Asignación de memoria dinámica
     nuevo->dato = p;
     nuevo->siguiente = NULL;
 
     if (cabeza == NULL) {
-        cabeza = nuevo;
+        cabeza = nuevo; // Caso 1: La lista está vacía, se define la cabeza
     } else {
         NodoLista* actual = cabeza;
-        while (actual->siguiente != NULL) {
+        while (actual->siguiente != NULL) { // Recorrido hasta el último nodo
             actual = actual->siguiente;
         }
-        actual->siguiente = nuevo;
+        actual->siguiente = nuevo; // Conexión del nuevo nodo al final
     }
     cout << "-> Proceso [" << p.nombre << "] (ID: " << p.id << ") registrado en la lista.\n";
 }
 
+// Imprime todos los procesos registrados en la lista
 void mostrarProcesos(NodoLista* cabeza) {
     if (cabeza == NULL) {
         cout << "\nNo hay procesos registrados en el sistema.\n";
@@ -65,7 +73,7 @@ void mostrarProcesos(NodoLista* cabeza) {
     }
     cout << "\n=== LISTA DE PROCESOS REGISTRADOS ===\n";
     NodoLista* actual = cabeza;
-    while (actual != NULL) {
+    while (actual != NULL) { // Iteración hasta el fin de la lista (NULL)
         cout << "ID: " << actual->dato.id 
              << " | Nombre: " << actual->dato.nombre 
              << " | Prioridad: " << actual->dato.prioridad 
@@ -75,15 +83,17 @@ void mostrarProcesos(NodoLista* cabeza) {
     }
 }
 
+// Busca un proceso por ID y retorna la dirección del nodo (o NULL si no existe)
 NodoLista* buscarProcesoPorId(NodoLista* cabeza, int id) {
     NodoLista* actual = cabeza;
     while (actual != NULL) {
-        if (actual->dato.id == id) return actual;
+        if (actual->dato.id == id) return actual; // Retorna el puntero al nodo
         actual = actual->siguiente;
     }
     return NULL;
 }
 
+// Busca e imprime todas las coincidencias asociadas a un nombre
 void buscarProcesoPorNombre(NodoLista* cabeza, string nombre) {
     NodoLista* actual = cabeza;
     bool encontrado = false;
@@ -101,6 +111,7 @@ void buscarProcesoPorNombre(NodoLista* cabeza, string nombre) {
     if (!encontrado) cout << "No se encontro ningun proceso con ese nombre.\n";
 }
 
+// Actualiza el campo prioridad del proceso seleccionado por ID
 void modificarPrioridad(NodoLista* cabeza, int id, int nuevaPrioridad) {
     NodoLista* nodo = buscarProcesoPorId(cabeza, id);
     if (nodo != NULL) {
@@ -111,16 +122,19 @@ void modificarPrioridad(NodoLista* cabeza, int id, int nuevaPrioridad) {
     }
 }
 
+// Elimina un nodo de la Lista Enlazada por ID y libera su memoria
 bool eliminarProceso(NodoLista*& cabeza, int id) {
     if (cabeza == NULL) return false;
 
+    // Caso A: El elemento a eliminar es la cabeza de la lista
     if (cabeza->dato.id == id) {
         NodoLista* temp = cabeza;
         cabeza = cabeza->siguiente;
-        delete temp;
+        delete temp; // Liberación de memoria dinámica
         return true;
     }
 
+    // Caso B: El elemento está en el cuerpo o final de la lista
     NodoLista* actual = cabeza;
     while (actual->siguiente != NULL && actual->siguiente->dato.id != id) {
         actual = actual->siguiente;
@@ -128,24 +142,29 @@ bool eliminarProceso(NodoLista*& cabeza, int id) {
 
     if (actual->siguiente != NULL) {
         NodoLista* temp = actual->siguiente;
-        actual->siguiente = actual->siguiente->siguiente;
-        delete temp;
+        actual->siguiente = actual->siguiente->siguiente; // Reconexión de punteros
+        delete temp; // Liberación de memoria dinámica
         return true;
     }
     return false;
 }
-// ===== 3. PLANIFICADOR DE CPU (COLA DE PRIORIDAD) =====
 
+// ============================================================================
+// ===== 3. PLANIFICADOR DE CPU (COLA DE PRIORIDAD) ===========================
+// ============================================================================
+
+// Inserta de forma ordenada en la cola (Menor valor numérico = Mayor prioridad)
 void encolarPorPrioridad(NodoCola*& frente, Proceso p) {
     NodoCola* nuevo = new NodoCola();
     nuevo->dato = p;
     nuevo->siguiente = NULL;
 
-    // Insercion ordenada: Menor numero = Mayor prioridad
+    // Caso 1: La cola está vacía o el proceso entrante tiene mayor prioridad que el primero
     if (frente == NULL || p.prioridad < frente->dato.prioridad) {
         nuevo->siguiente = frente;
         frente = nuevo;
     } else {
+        // Caso 2: Buscar la posición correcta dentro de la cola
         NodoCola* actual = frente;
         while (actual->siguiente != NULL && actual->siguiente->dato.prioridad <= p.prioridad) {
             actual = actual->siguiente;
@@ -156,18 +175,20 @@ void encolarPorPrioridad(NodoCola*& frente, Proceso p) {
     cout << "-> Proceso ID " << p.id << " agregado a la Cola de Prioridad de CPU.\n";
 }
 
+// Extrae el elemento del frente de la cola (mayor prioridad) y simula su ejecución
 void ejecutarProcesoCPU(NodoCola*& frente) {
     if (frente == NULL) {
         cout << "\nNo hay procesos pendientes en la cola de CPU.\n";
         return;
     }
-    NodoCola* aEjecutar = frente;
-    frente = frente->siguiente;
+    NodoCola* aEjecutar = frente; // Tomar elemento del frente
+    frente = frente->siguiente;    // Desplazar el frente al siguiente nodo
     cout << "\n>>> [CPU EJECUTANDO] Proceso ID " << aEjecutar->dato.id 
          << " (" << aEjecutar->dato.nombre << ") | Prioridad: " << aEjecutar->dato.prioridad << " <<<\n";
-    delete aEjecutar;
+    delete aEjecutar; // Liberar nodo de la cola
 }
 
+// Muestra los elementos formados en la cola de la CPU
 void mostrarColaCPU(NodoCola* frente) {
     if (frente == NULL) {
         cout << "\nLa cola de CPU esta vacia.\n";
@@ -182,15 +203,20 @@ void mostrarColaCPU(NodoCola* frente) {
         actual = actual->siguiente;
     }
 }
-// ===== 4. GESTOR DE MEMORIA (PILA DINAMICA) =====
 
+// ============================================================================
+// ===== 4. GESTOR DE MEMORIA (PILA DINÁMICA) =================================
+// ============================================================================
+
+// PUSH: Coloca un elemento en el tope de la Pila
 void apilarBloque(NodoPila*& tope, BloqueMemoria b) {
     NodoPila* nuevo = new NodoPila();
     nuevo->dato = b;
     nuevo->siguiente = tope;
-    tope = nuevo;
+    tope = nuevo; // El tope apunta al nuevo nodo
 }
 
+// POP: Retira y retorna el elemento del tope de la Pila
 BloqueMemoria desapilarBloque(NodoPila*& tope) {
     if (tope == NULL) {
         BloqueMemoria nulo = {-1, 0, -1};
@@ -198,34 +224,38 @@ BloqueMemoria desapilarBloque(NodoPila*& tope) {
     }
     NodoPila* temp = tope;
     BloqueMemoria b = temp->dato;
-    tope = tope->siguiente;
+    tope = tope->siguiente; // El tope desciende al siguiente nodo
     delete temp;
     return b;
 }
 
+// Inicializa la memoria RAM creando 5 bloques con capacidades fijas
 void inicializarMemoria(NodoPila*& tope) {
     int tamanos[] = {1024, 512, 256, 128, 64};
     for (int i = 0; i < 5; i++) {
-        BloqueMemoria b = {i + 1, tamanos[i], -1};
+        BloqueMemoria b = {i + 1, tamanos[i], -1}; // idProceso = -1 (LIBRE)
         apilarBloque(tope, b);
     }
 }
 
+// Busca un bloque apto desapilando temporalmente hacia una Pila Auxiliar
 bool asignarMemoria(NodoPila*& tope, int idProceso, int memoriaSolicitada) {
     NodoPila* pilaAux = NULL;
     bool asignado = false;
 
+    // Desapilar y verificar disponibilidad
     while (tope != NULL) {
         BloqueMemoria b = desapilarBloque(tope);
         if (!asignado && b.idProceso == -1 && b.tamanoMB >= memoriaSolicitada) {
-            b.idProceso = idProceso;
+            b.idProceso = idProceso; // Asignar ID al bloque
             asignado = true;
             cout << "-> Bloque " << b.idBloque << " (" << b.tamanoMB 
                  << " MB) asignado al Proceso ID " << idProceso << ".\n";
         }
-        apilarBloque(pilaAux, b);
+        apilarBloque(pilaAux, b); // Pasar a la pila auxiliar
     }
 
+    // Restaurar el contenido desde la Pila Auxiliar a la Pila Principal
     while (pilaAux != NULL) {
         apilarBloque(tope, desapilarBloque(pilaAux));
     }
@@ -234,6 +264,7 @@ bool asignarMemoria(NodoPila*& tope, int idProceso, int memoriaSolicitada) {
     return asignado;
 }
 
+// Marca como LIBRE (-1) el bloque asignado a un ID
 bool liberarMemoria(NodoPila*& tope, int idProceso) {
     NodoPila* pilaAux = NULL;
     bool liberado = false;
@@ -241,13 +272,14 @@ bool liberarMemoria(NodoPila*& tope, int idProceso) {
     while (tope != NULL) {
         BloqueMemoria b = desapilarBloque(tope);
         if (b.idProceso == idProceso) {
-            b.idProceso = -1;
+            b.idProceso = -1; // Liberar bloque
             liberado = true;
             cout << "-> Memoria del Bloque " << b.idBloque << " liberada para el Proceso ID " << idProceso << ".\n";
         }
         apilarBloque(pilaAux, b);
     }
 
+    // Restaurar Pila Principal
     while (pilaAux != NULL) {
         apilarBloque(tope, desapilarBloque(pilaAux));
     }
@@ -255,6 +287,7 @@ bool liberarMemoria(NodoPila*& tope, int idProceso) {
     return liberado;
 }
 
+// Recorre desapilando temporalmente para visualizar la estructura de la RAM
 void mostrarMemoria(NodoPila* tope) {
     cout << "\n=== ESTADO DE LA MEMORIA (PILA) ===\n";
     NodoPila* pilaAux = NULL;
@@ -267,12 +300,17 @@ void mostrarMemoria(NodoPila* tope) {
         apilarBloque(pilaAux, b);
     }
 
+    // Restaurar Pila Principal
     while (pilaAux != NULL) {
         apilarBloque(tope, desapilarBloque(pilaAux));
     }
 }
-// ===== 5. PERSISTENCIA DE DATOS (ARCHIVOS) =====
 
+// ============================================================================
+// ===== 5. PERSISTENCIA DE DATOS (ARCHIVOS) ==================================
+// ============================================================================
+
+// Guarda el estado de la Lista Enlazada en un archivo 'procesos.txt'
 void guardarEnArchivo(NodoLista* cabeza) {
     ofstream archivo("procesos.txt");
     if (!archivo.is_open()) {
@@ -292,6 +330,7 @@ void guardarEnArchivo(NodoLista* cabeza) {
     cout << "-> Estado del sistema guardado en 'procesos.txt'.\n";
 }
 
+// Carga la información desde 'procesos.txt' al iniciar la ejecución
 void cargarDesdeArchivo(NodoLista*& cabeza, int& contadorID) {
     ifstream archivo("procesos.txt");
     if (!archivo.is_open()) return;
@@ -303,6 +342,7 @@ void cargarDesdeArchivo(NodoLista*& cabeza, int& contadorID) {
         stringstream ss(linea);
         string idStr, nombre, prioStr, tiempoStr, memStr;
 
+        // Lectura de valores delimitados por coma (CSV)
         getline(ss, idStr, ',');
         getline(ss, nombre, ',');
         getline(ss, prioStr, ',');
@@ -310,8 +350,6 @@ void cargarDesdeArchivo(NodoLista*& cabeza, int& contadorID) {
         getline(ss, memStr, ',');
 
         Proceso p;
-        
-        // Conversion portable compatible con Dev-C++ antiguo (sin usar stoi)
         stringstream ssId(idStr); ssId >> p.id;
         p.nombre = nombre;
         stringstream ssPrio(prioStr); ssPrio >> p.prioridad;
@@ -322,11 +360,15 @@ void cargarDesdeArchivo(NodoLista*& cabeza, int& contadorID) {
         registrarProceso(cabeza, p);
     }
     archivo.close();
-    contadorID = maxID + 1;
+    contadorID = maxID + 1; // Siguiente ID disponible
     cout << "-> Datos recuperados exitosamente desde 'procesos.txt'.\n";
 }
-// ===== 6. SUBMENÚS Y MENÚ PRINCIPAL =====
 
+// ============================================================================
+// ===== 6. INTERFAZ Y CONTROLADORES DE MENÚ ==================================
+// ============================================================================
+
+// Submenú 1: Operaciones del Gestor de Procesos
 void subMenuProcesos(NodoLista*& listaProcesos, NodoPila*& pilaMemoria, int& contadorID) {
     int op;
     do {
@@ -356,7 +398,7 @@ void subMenuProcesos(NodoLista*& listaProcesos, NodoPila*& pilaMemoria, int& con
                 int id;
                 cout << "ID a eliminar: "; cin >> id;
                 if (eliminarProceso(listaProcesos, id)) {
-                    liberarMemoria(pilaMemoria, id);
+                    liberarMemoria(pilaMemoria, id); // Al eliminar proceso, desasigna su bloque RAM
                     cout << "Proceso eliminado de la lista y memoria liberada.\n";
                 } else cout << "Proceso no encontrado.\n";
                 break;
@@ -395,6 +437,7 @@ void subMenuProcesos(NodoLista*& listaProcesos, NodoPila*& pilaMemoria, int& con
     } while (op != 0);
 }
 
+// Submenú 2: Operaciones del Planificador de CPU
 void subMenuCPU(NodoCola*& colaCPU, NodoLista* listaProcesos) {
     int op;
     do {
@@ -430,6 +473,7 @@ void subMenuCPU(NodoCola*& colaCPU, NodoLista* listaProcesos) {
     } while (op != 0);
 }
 
+// Submenú 3: Operaciones del Gestor de Memoria RAM
 void subMenuMemoria(NodoPila*& pilaMemoria, NodoLista* listaProcesos) {
     int op;
     do {
@@ -470,12 +514,15 @@ void subMenuMemoria(NodoPila*& pilaMemoria, NodoLista* listaProcesos) {
     } while (op != 0);
 }
 
+// Función principal
 int main() {
+    // Declaración e inicialización de punteros de cabecera
     NodoLista* listaProcesos = NULL;
     NodoCola* colaCPU = NULL;
     NodoPila* pilaMemoria = NULL;
     int contadorID = 1;
 
+    // Inicialización del sistema
     inicializarMemoria(pilaMemoria);
     cargarDesdeArchivo(listaProcesos, contadorID);
 
@@ -512,5 +559,4 @@ int main() {
 
     return 0;
 }
-
 
